@@ -26,13 +26,23 @@ Param(
 	[string]$ServiceName
 )
 
-$ImageName = (get-azurevmimage | ? {$_.imagename -like "*2012*datacenter*"} |  Sort-Object -Descending publisheddate)[0].imagename
-$VMConfig = New-AzureVMConfig -Name $VMName -InstanceSize $VMSize -ImageName $ImageName
-$ProvisioningConfig = $VMConfig | Add-AzureProvisioningConfig -Windows -Password $Password -AdminUsername $AdminUsername
+$job = Start-Job -ScriptBlock {
+	param ($vname, $vsize, $pw, $user, $group, $svc)
+	$ImageName = (get-azurevmimage | ? {$_.imagename -like "*2012*datacenter*"} |  Sort-Object -Descending publisheddate)[0].imagename
+	$VMConfig = New-AzureVMConfig -Name $vname -InstanceSize $vsize -ImageName $ImageName
+	$ProvisioningConfig = $VMConfig | Add-AzureProvisioningConfig -Windows -Password $pw -AdminUsername $user
+	$ProvisioningConfig | New-AzureVM -AffinityGroup $group -ServiceName $svc
+	} -ArgumentList $VMName, $VMSize, $Password, $AdminUsername, $AffinityGroup, $ServiceName
 
-Write-Host "Running New-AzureVM command"
-$VM = $ProvisioningConfig | New-AzureVM -AffinityGroup $AffinityGroup -ServiceName $ServiceName
-Write-Host "Running New-AzureVM command completed!"
+Write-Host "Running New-AzureVM" -NoNewline
+while (!([string]($job | get-job).State).Equals("Completed")) {
+	Write-Host "." -NoNewline
+	Start-Sleep -Seconds 1
+}
+
+Write-Host "`nNew-AzureVM command completed!"
+
+$VM = Get-AzureVM -ServiceName $ServiceName -Name $VMName
 
 $VMLastStatus = ""
 while (!$VM.Status.Equals("ReadyRole")) {
@@ -52,7 +62,8 @@ while (!$VM.Status.Equals("ReadyRole")) {
 }
 
 if ($VM.Status.Equals("ReadyRole")) {
-	Write-Host "VM deployed succesfully"
+	Write-Host "`nVM deployed succesfully"
 } else {
-	Write-Host "VM deployed with errors"
+	Write-Host "`nVM deployed with errors"
 }
+#>
