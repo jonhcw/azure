@@ -4,27 +4,87 @@
 
 [CmdletBinding()]
 Param(
-	[Parameter(Mandatory=$True)]
+	[Parameter(Mandatory=$True, ParameterSetName="Prereqs")]
+	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
 	[string]$VMName,
 
-	[Parameter(Mandatory=$True)]
+	[Parameter(Mandatory=$True, ParameterSetName="Prereqs")]
+	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
 	[ValidateSet("ExtraSmall", "Small", "Medium", "Large", "ExtraLarge")]
 	[string]$VMSize,
 
-	[Parameter(Mandatory=$True)]
+	[Parameter(Mandatory=$True, ParameterSetName="Prereqs")]
+	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
 	[String]$Password,
 
-	[Parameter(Mandatory=$True)]
+	[Parameter(Mandatory=$True, ParameterSetName="Prereqs")]
+	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
 	[string]$AdminUsername,
 
-	[Parameter(Mandatory=$True)]
-	[ValidateScript({Get-AzureAffinityGroup -Name $_})]
+	[Parameter(Mandatory=$True, ParameterSetName="Prereqs")]
+	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
 	[string]$AffinityGroup,
 
-	[Parameter(Mandatory=$True)]
-	[ValidateScript({Get-AzureService -ServiceName $_})]
-	[string]$ServiceName
+	[Parameter(Mandatory=$True, ParameterSetName="Prereqs")]
+	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]	
+	[string]$ServiceName,
+
+	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
+	[string]$ServiceLabel,
+
+	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
+	[ValidateScript({ $loc = $_; Get-AzureLocation | ? {$_.Name -match $loc}})]
+	[string]$Location,
+
+	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
+	[string]$AffinityLabel,
+
+	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
+	[string]$StorageName,
+
+	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
+	[string]$StorageLabel
+
+
 )
+
+# Check whether the Affinity Group exists and create it if it doesn't. Also craete StorageAccount and AzureService
+if ((Get-AzureAffinityGroup | ? {$_.Name -match $AffinityGroup}) -eq $null) {
+	# Validate parameters
+	if ([string]::IsNullOrEmpty($Location)) {
+		Write-Warning "AffinityGroup $($AffinityGroup) does not exist, you must specify $Location!"
+		exit
+	} else {
+		$AzureLocations = Get-AzureLocation
+		if (($AzureLocations | ? {$_.Name.Equals($Location)}) -eq $null) {
+			$message = "Invalid AzureLocation provided! Valid options for this subscription are:"
+			$AzureLocations | % { $message += "`n  $($_.Name)"}
+			Write-Warning $message
+			exit
+		}
+	}
+
+	try {
+		$error.Clear()
+		Write-Host "Creating new Affinity Group $($AffinityGroup)"
+		New-AzureAffinityGroup -Name $AffinityGroup -Location $Location -Label $AffinityLabel
+
+		Write-Host "Creating new Storage Account $($StorageName)"
+		New-AzureStorageAccount -StorageAccountName $StorageName -AffinityGroup $AffinityGroup -Label $StorageLabel
+
+		Write-Host "Creating new Azure Service $($ServiceName)"
+		New-AzureService -ServiceName $ServiceName -Location $Location -Label $ServiceLabel
+
+		if ($error[0] -ne $null) {
+			exit
+		}
+
+		Write-Host "Prerequisite services created!"
+	} catch {
+			Write-Error "Error creating Affinity group or relevant services! $($_.Exception.Message)"
+			exit
+	} 
+}
 
 
 # Run commands to actually create the VM. Run as a Job so we can print status information
@@ -65,8 +125,7 @@ while (!$VM.Status.Equals("ReadyRole")) {
 	Start-Sleep -Seconds 1
 }
 
-# Not sure what exactly are the indicators that it deployed totally succesfully. I'm assuming
-
+# Not sure what exactly are the indicators that it deployed totally succesfully. I'm assuming errorcode should be null. If it is and Status is ReadyRole, report succesful deployment
 if ($VM.InstanceErrorCode -ne $null) {
 	Write-Host "`nVM deployed with errors"
 }
@@ -75,4 +134,3 @@ elseif ($VM.Status.Equals("ReadyRole")) {
 } else {
 	Write-Host "`nVM deployed with errors"
 }
-#>
