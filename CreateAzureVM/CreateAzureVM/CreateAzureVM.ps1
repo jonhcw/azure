@@ -26,7 +26,8 @@ Param(
 	[string]$ServiceName
 )
 
-$VMConfig = New-AzureVMConfig -Name $VMName -InstanceSize $VMSize -ImageName a699494373c04fc0bc8f2bb1389d6106__Windows-Server-2012-Datacenter-20151120-en.us-127GB.vhd
+$ImageName = (get-azurevmimage | ? {$_.imagename -like "*2012*datacenter*"} |  Sort-Object -Descending publisheddate)[0].imagename
+$VMConfig = New-AzureVMConfig -Name $VMName -InstanceSize $VMSize -ImageName $ImageName
 $ProvisioningConfig = $VMConfig | Add-AzureProvisioningConfig -Windows -Password $Password -AdminUsername $AdminUsername
 
 Write-Host "Running New-AzureVM command"
