@@ -1,6 +1,5 @@
-﻿#
-# CreateAzureVM.ps1
-#
+﻿#Requires -Modules Azure
+
 
 [CmdletBinding()]
 Param(
@@ -48,9 +47,21 @@ Param(
 
 )
 
+function Write-Success {
+	Write-Host "[" -NoNewline
+	Write-Host -ForegroundColor Green " SUCCESS " -NoNewline
+	Write-Host "]"
+}
+
+function Write-Failure {
+	Write-Host "[" -NoNewline
+	Write-Host -ForegroundColor Red " FAILURE " -NoNewline
+	Write-Host "]"
+}
+
 # Check whether the Affinity Group exists and create it if it doesn't. Also craete StorageAccount and AzureService
 if ((Get-AzureAffinityGroup | ? {$_.Name -match $AffinityGroup}) -eq $null) {
-	# Validate parameters
+	# Validate Location parameter. This is done here because it's harder to accomplish this complicated script in ValidateScript 
 	if ([string]::IsNullOrEmpty($Location)) {
 		Write-Warning "AffinityGroup $($AffinityGroup) does not exist, you must specify $Location!"
 		exit
@@ -64,24 +75,26 @@ if ((Get-AzureAffinityGroup | ? {$_.Name -match $AffinityGroup}) -eq $null) {
 		}
 	}
 
+	# Create required Services. Inside a try/catch as it's considered a single phase with many steps.
 	try {
-		$error.Clear()
-		Write-Host "Creating new Affinity Group $($AffinityGroup)"
-		New-AzureAffinityGroup -Name $AffinityGroup -Location $Location -Label $AffinityLabel
+		Write-Host "Creating prerequisite services "
+		Write-Host "Creating new Affinity Group"
+		New-AzureAffinityGroup -Name $AffinityGroup -Location $Location -Label $AffinityLabel -ErrorAction Stop
+		Write-Success
 
-		Write-Host "Creating new Storage Account $($StorageName)"
-		New-AzureStorageAccount -StorageAccountName $StorageName -AffinityGroup $AffinityGroup -Label $StorageLabel
+		Write-Host ([string]::Format("  {0,-35}", "Creating new Storage Account")) -NoNewline
+		New-AzureStorageAccount -StorageAccountName $StorageName -AffinityGroup $AffinityGroup -Label $StorageLabel -ErrorAction Stop
+		Write-Success
 
-		Write-Host "Creating new Azure Service $($ServiceName)"
+		Write-Host "Creating new Azure Service"
 		New-AzureService -ServiceName $ServiceName -Location $Location -Label $ServiceLabel
+		Write-Success
 
-		if ($error[0] -ne $null) {
-			exit
-		}
-
-		Write-Host "Prerequisite services created!"
+		Write-Host -ForegroundColor Green "Prerequisite services created!"
 	} catch {
-			Write-Error "Error creating Affinity group or relevant services! $($_.Exception.Message)"
+			Write-Failure
+			Write-Warning "Error creating Affinity group or relevant services!"
+			throw $_.Exception.Message
 			exit
 	} 
 }
@@ -99,10 +112,12 @@ $job = Start-Job -ScriptBlock {
 
 # Print status information for New-AzureVM command
 Write-Host "Running New-AzureVM" -NoNewline
-while (!([string]($job | get-job).State).Equals("Completed") -or !([string]($job | get-job).State).Equals("Failed")) {
-	Write-Host "." -NoNewline
+while (!([string]($job | get-job).State).Equals("Completed")) {
+	Write-Host ($job | get-job).State  -NoNewline
 	Start-Sleep -Seconds 1
 }
+
+$job | get-job
 
 Write-Host "`nNew-AzureVM command completed!"
 
