@@ -28,6 +28,7 @@ Param(
 	[string]$ServiceLabel,
 
 	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
+	[Parameter(Mandatory=$True, ParameterSetName="Prereqs")]
 	[ValidateScript({ $loc = $_; Get-AzureLocation | ? {$_.Name -match $loc}})]
 	[string]$Location,
 
@@ -67,11 +68,12 @@ function Write-Working  {
 	[Console]::ForegroundColor = $color
 	[Console]::Write(" WORKING ")
 	[Console]::ForegroundColor = $startc
+
+	[Console]::Write("]")
+
 	if ($StartTime) {
-	[Console]::Write("] $([int]((get-date) - $StartTime).TotalSeconds)s ")
-	} else {
-		[Console]::Write("]")
-	}
+		[Console]::Write("] $([int]((get-date) - $StartTime).TotalSeconds)s ")
+	} 
 
 	# string format is ugly hack
 	if (![string]::IsNullOrEmpty($Message)) {  [Console]::Write([string]::Format("{0, -30}", $Message)) }
