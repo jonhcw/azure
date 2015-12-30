@@ -73,7 +73,8 @@ function Write-Working  {
 		[Console]::Write("]")
 	}
 
-	if (![string]::IsNullOrEmpty($Message)) { [Console]::Write(" $($Message)") }
+	# string format is ugly hack
+	if (![string]::IsNullOrEmpty($Message)) {  [Console]::Write([string]::Format("{0, -30}", $Message)) }
 	[Console]::CursorLeft = $startp
 }
 
@@ -179,20 +180,21 @@ $job = Start-Job -ScriptBlock {
 
 Write-Host ([string]::Format("  {0,-35}", "Running New-AzureVM")) -NoNewline
 Write-JobStatus -Job $job.Id
-#$job | Remove-Job
+$job | Remove-Job
 
 # Wait for the VM status to become "ReadyRole". If there are any error codes, break and report.
 Write-Host ([string]::Format("  {0,-35}", "Waiting for 'ReadyRole' status")) -NoNewline
 $VM = Get-AzureVM -ServiceName $ServiceName -Name $VMName
 
 $n = 0
+$StartDate = Get-Date
 while (!$VM.Status.Equals("ReadyRole")) {
 	if ($VM.InstanceErrorCode -ne $null) {
 		break
 	}
 
 	$VM = $VM | Get-AzureVM
-	Write-Working -CursorHorizontalPosition ([Console]::CursorLeft) -Number $n -Message $VMName.Status
+	Write-Working -CursorHorizontalPosition ([Console]::CursorLeft) -Number $n -StartTime $StartDate -Message $VM.Status
 
 	Start-Sleep -Seconds 1
 	$n++
