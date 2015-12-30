@@ -72,7 +72,7 @@ function Write-Working  {
 	[Console]::Write("]")
 
 	if ($StartTime) {
-		[Console]::Write("] $([int]((get-date) - $StartTime).TotalSeconds)s ")
+		[Console]::Write(" $([int]((get-date) - $StartTime).TotalSeconds)s ")
 	} 
 
 	# string format is ugly hack
@@ -94,12 +94,18 @@ function Write-JobStatus {
 	$StartTime = get-date
 	
 	$n = 0
-	while (!(get-job -Id $JobId).State.Equals("Completed")) {
-		Write-Working -CursorHorizontalPosition ([Console]::CursorLeft) -Number $n -StartTime $StartTime
-		$n++
-		Start-Sleep -Seconds 1
-	}
 	try { 
+		while (!(get-job -Id $JobId).State.Equals("Completed")) {
+			if ((get-job -Id $JobId).State.Equals("Failed")) {
+				$result = Receive-Job -Id $JobId -ErrorAction SilentlyContinue
+				Remove-Job -Id $JobId
+				throw $error[0]
+			}
+
+			Write-Working -CursorHorizontalPosition ([Console]::CursorLeft) -Number $n -StartTime $StartTime
+			$n++
+			Start-Sleep -Seconds 1
+		}
 		$job | Receive-Job 
 	} 
 	catch { 
