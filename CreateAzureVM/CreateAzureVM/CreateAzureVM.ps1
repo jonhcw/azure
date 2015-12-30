@@ -40,25 +40,6 @@ Param(
 
 )
 
-function Write-Working  {
-	param ([int]$CursorHorizontalPosition, [int]$Number)
-	$startp = $CursorHorizontalPosition
-	[Console]::Write("[")
-
-	$startt = [Console]::CursorTop
-	$startc = [Console]::ForegroundColor
-	$color = "";
-
-	if ($i % 2 -eq 0) { $color = [Console]::BackgroundCOlor } else { $color = [System.ConsoleColor]::Yellow }
-	[Console]::CursorTop = $startt
-	[Console]::ForegroundColor = $color
-	[Console]::Write(" WORKING ")
-	[Console]::ForegroundColor = $startc
-	[Console]::Write("] $($i)s")
-	[Console]::CursorLeft = $startp
-
-}
-
 function Write-Success {
 	Write-Host "[" -NoNewline
 	Write-Host -ForegroundColor Green " SUCCESS " -NoNewline
@@ -72,7 +53,7 @@ function Write-Failure {
 }
 
 function Write-Working  {
-	param ([int]$CursorHorizontalPosition, [int]$Number)
+	param ([string]$Message, [int]$CursorHorizontalPosition, [int]$Number, [switch]$NumberIsSeconds)
 	$startp = $CursorHorizontalPosition
 	[Console]::Write("[")
 
@@ -80,14 +61,19 @@ function Write-Working  {
 	$startc = [Console]::ForegroundColor
 	$color = "";
 
-	if ($i % 2 -eq 0) { $color = [Console]::BackgroundCOlor } else { $color = [System.ConsoleColor]::Yellow }
+	if ($Number % 2 -eq 0) { $color = [Console]::BackgroundColor } else { $color = [System.ConsoleColor]::Yellow }
 	[Console]::CursorTop = $startt
 	[Console]::ForegroundColor = $color
 	[Console]::Write(" WORKING ")
 	[Console]::ForegroundColor = $startc
-	[Console]::Write("] $($i)s")
-	[Console]::CursorLeft = $startp
+	if ($NumberIsSeconds) {
+	[Console]::Write("] $($Number)s ")
+	} else {
+		[Console]::Write("]")
+	}
 
+	if (![string]::IsNullOrEmpty($Message)) { [Console]::Write(" $($Message)") }
+	[Console]::CursorLeft = $startp
 }
 
 
@@ -96,8 +82,9 @@ function Write-JobStatus {
 
 	$n = 0
 	while (!(get-job -Id $JobId).State.Equals("Completed")) {
-		Write-Working -CursorHorizontalPosition ([Console]::CursorLeft) -Number $n
+		Write-Working -CursorHorizontalPosition ([Console]::CursorLeft) -Number $n -NumberIsSeconds
 		$n++
+		Start-Sleep -Seconds 1
 	}
 	try { 
 		$job | Receive-Job 
@@ -128,7 +115,7 @@ if ($PSCmdlet.ParameterSetName.Equals(("NoPrereqs"))) {
 	}
 
 	# Check StorageAccount
-	if ((Get-AzureStorageAccount -WarningAction silentlycontinue | ? {$_.StorageAccoutName.Equals($StorageName)}) -ne $null) {
+	if ((Get-AzureStorageAccount -WarningAction silentlycontinue | ? {$_.StorageAccountName.Equals($StorageName)}) -ne $null) {
 		Write-Host ([string]::Format("  {0,-35}", "StorageAccount Status")) -NoNewline
 		Write-Success
 	} else {
@@ -168,15 +155,15 @@ if ($PSCmdlet.ParameterSetName.Equals(("NoPrereqs"))) {
 	}
 }
 
-<#
+
 # Run commands to actually create the VM. Run as a Job so we can print status information
 $job = Start-Job -ScriptBlock {
-	param ($vname, $vsize, $pw, $user, $group, $svc)
+	param ($vname, $vsize, $pw, $user, $svc)
 	$ImageName = (get-azurevmimage | ? {$_.imagename -like "*2012*datacenter*"} |  Sort-Object -Descending publisheddate)[0].imagename
 	$VMConfig = New-AzureVMConfig -Name $vname -InstanceSize $vsize -ImageName $ImageName
 	$ProvisioningConfig = $VMConfig | Add-AzureProvisioningConfig -Windows -Password $pw -AdminUsername $user
-	$ProvisioningConfig | New-AzureVM -AffinityGroup $group -ServiceName $svc
-	} -ArgumentList $VMName, $VMSize, $Password, $AdminUsername, $AffinityGroup, $ServiceName
+	$ProvisioningConfig | New-AzureVM -ServiceName $svc
+	} -ArgumentList $VMName, $VMSize, $Password, $AdminUsername, $ServiceName
 
 
 Write-Host ([string]::Format("  {0,-35}", "Running New-AzureVM")) -NoNewline
@@ -186,31 +173,32 @@ $job | Remove-Job
 Write-Host "`nNew-AzureVM command completed!"
 
 # Wait for the VM status to become "ReadyRole". If there are any error codes, break and report.
+Write-Host ([string]::Format("  {0,-35}", "Waiting for 'ReadyRole' status")) -NoNewline
 $VM = Get-AzureVM -ServiceName $ServiceName -Name $VMName
-$VMLastStatus = ""
+
+$n = 0
 while (!$VM.Status.Equals("ReadyRole")) {
 	if ($VM.InstanceErrorCode -ne $null) {
-		Write-Error $VM.InstanceErrorCode
+		
 		break
 	}
 
 	$VM = $VM | Get-AzureVM
-	if ($VMLastStatus -eq $VM.Status) { 
-		Write-Host "." -NoNewline
-	} else {
-		Write-Host "`nVM in status $($VM.Status)" -NoNewline
-	}
-	$VMLastStatus = $VM.Status
+	Write-Working -CursorHorizontalPosition ([Console]::CursorLeft) -Number $n -Message $VMName.Status
+
 	Start-Sleep -Seconds 1
+	$n++
 }
 
 # Not sure what exactly are the indicators that it deployed totally succesfully. I'm assuming errorcode should be null. If it is and Status is ReadyRole, report succesful deployment
 if ($VM.InstanceErrorCode -ne $null) {
-	Write-Host "`nVM deployed with errors"
+	Write-Failure
+	Write-Error $VM.InstanceErrorCode
 }
 elseif ($VM.Status.Equals("ReadyRole")) {
 	Write-Host "`nVM deployed succesfully"
 } else {
-	Write-Host "`nVM deployed with errors"
+	Write-Failure
+	Write-Error $VM.InstanceErrorCode
+	
 }
-#>
