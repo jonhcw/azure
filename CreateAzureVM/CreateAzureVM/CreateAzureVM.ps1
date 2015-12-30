@@ -101,17 +101,12 @@ function Write-JobStatus {
 # If user also needs to create Storage Account / Service
 if ($PSCmdlet.ParameterSetName.Equals(("NoPrereqs"))) {
 	# Validate Location parameter. This is done here because it's harder to accomplish this complicated script in ValidateScript 
-	if ([string]::IsNullOrEmpty($Location)) {
-		Write-Warning "AffinityGroup $($AffinityGroup) does not exist, you must specify $Location!"
+	$AzureLocations = Get-AzureLocation
+	if (($AzureLocations | ? {$_.Name.Equals($Location)}) -eq $null) {
+		$message = "Invalid AzureLocation provided! Valid options for this subscription are:"
+		$AzureLocations | % { $message += "`n  $($_.Name)"}
+		Write-Warning $message
 		exit
-	} else {
-		$AzureLocations = Get-AzureLocation
-		if (($AzureLocations | ? {$_.Name.Equals($Location)}) -eq $null) {
-			$message = "Invalid AzureLocation provided! Valid options for this subscription are:"
-			$AzureLocations | % { $message += "`n  $($_.Name)"}
-			Write-Warning $message
-			exit
-		}
 	}
 
 	# Check StorageAccount
@@ -159,7 +154,7 @@ if ($PSCmdlet.ParameterSetName.Equals(("NoPrereqs"))) {
 # Run commands to actually create the VM. Run as a Job so we can print status information
 $job = Start-Job -ScriptBlock {
 	param ($vname, $vsize, $pw, $user, $svc)
-	$ImageName = (get-azurevmimage | ? {$_.imagename -like "*2012*datacenter*"} |  Sort-Object -Descending publisheddate)[0].imagename | Out-Null
+	$ImageName = (get-azurevmimage | ? {$_.imagename -like "*2012*datacenter*"} |  Sort-Object -Descending publisheddate)[0].imagename
 	$VMConfig = New-AzureVMConfig -Name $vname -InstanceSize $vsize -ImageName $ImageName | Out-Null
 	$ProvisioningConfig = $VMConfig | Add-AzureProvisioningConfig -Windows -Password $pw -AdminUsername $user | Out-Null
 	$ProvisioningConfig | New-AzureVM -ServiceName $svc | Out-Null
