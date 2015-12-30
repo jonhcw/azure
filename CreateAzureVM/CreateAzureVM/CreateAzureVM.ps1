@@ -159,18 +159,16 @@ if ($PSCmdlet.ParameterSetName.Equals(("NoPrereqs"))) {
 # Run commands to actually create the VM. Run as a Job so we can print status information
 $job = Start-Job -ScriptBlock {
 	param ($vname, $vsize, $pw, $user, $svc)
-	$ImageName = (get-azurevmimage | ? {$_.imagename -like "*2012*datacenter*"} |  Sort-Object -Descending publisheddate)[0].imagename
-	$VMConfig = New-AzureVMConfig -Name $vname -InstanceSize $vsize -ImageName $ImageName
-	$ProvisioningConfig = $VMConfig | Add-AzureProvisioningConfig -Windows -Password $pw -AdminUsername $user
-	$ProvisioningConfig | New-AzureVM -ServiceName $svc
+	$ImageName = (get-azurevmimage | ? {$_.imagename -like "*2012*datacenter*"} |  Sort-Object -Descending publisheddate)[0].imagename | Out-Null
+	$VMConfig = New-AzureVMConfig -Name $vname -InstanceSize $vsize -ImageName $ImageName | Out-Null
+	$ProvisioningConfig = $VMConfig | Add-AzureProvisioningConfig -Windows -Password $pw -AdminUsername $user | Out-Null
+	$ProvisioningConfig | New-AzureVM -ServiceName $svc | Out-Null
 	} -ArgumentList $VMName, $VMSize, $Password, $AdminUsername, $ServiceName
 
 
 Write-Host ([string]::Format("  {0,-35}", "Running New-AzureVM")) -NoNewline
 Write-JobStatus -Job $job.Id
 $job | Remove-Job
-
-Write-Host "`nNew-AzureVM command completed!"
 
 # Wait for the VM status to become "ReadyRole". If there are any error codes, break and report.
 Write-Host ([string]::Format("  {0,-35}", "Waiting for 'ReadyRole' status")) -NoNewline
@@ -196,7 +194,7 @@ if ($VM.InstanceErrorCode -ne $null) {
 	Write-Error $VM.InstanceErrorCode
 }
 elseif ($VM.Status.Equals("ReadyRole")) {
-	Write-Host "`nVM deployed succesfully"
+	Write-Success
 } else {
 	Write-Failure
 	Write-Error $VM.InstanceErrorCode
