@@ -98,7 +98,25 @@ function Write-Working  {
 	}
 	[Console]::ForegroundColor = $startc
 	write-host
+}
 
+function Write-JobStatus {
+	param ([int]$JobId)
+
+	$n = 0
+	while (!(get-job -Id $JobId).State.Equals("Completed")) {
+		Write-Working -CursorHorizontalPosition ([Console]::CursorLeft) -Number $n
+		$n++
+	}
+	try { 
+		$job | Receive-Job 
+	} 
+	catch { 
+		Write-Failure 
+		throw $_.Exception		
+	}
+
+	Write-Success
 }
 
 # Check whether the Affinity Group exists and create it if it doesn't. Also craete StorageAccount and AzureService
@@ -119,18 +137,36 @@ if ((Get-AzureAffinityGroup | ? {$_.Name -match $AffinityGroup}) -eq $null) {
 
 	# Create required Services. Inside a try/catch as it's considered a single phase with many steps.
 	try {
+		# Create Affinity Group
 		Write-Host "Creating prerequisite services "
-		Write-Host "Creating new Affinity Group"
-		New-AzureAffinityGroup -Name $AffinityGroup -Location $Location -Label $AffinityLabel -ErrorAction Stop
-		Write-Success
+		Write-Host ([string]::Format("  {0,-35}", "Creating new Affinity Group")) -NoNewline 
+		$job = Start-Job -ScriptBlock { 
+			param($affgroup, $loc, $afflabel)
+			New-AzureAffinityGroup -Name $affgroup -Location $loc -Label $afflabel -ErrorAction Stop 
+		} -ArgumentList $AffinityGroup, $Location, $AffinityLabel
 
+		Write-JobStatus -Job $job.Id
+		$job | Remove-Job
+
+		# Create Storage Account
 		Write-Host ([string]::Format("  {0,-35}", "Creating new Storage Account")) -NoNewline
-		New-AzureStorageAccount -StorageAccountName $StorageName -AffinityGroup $AffinityGroup -Label $StorageLabel -ErrorAction Stop
-		Write-Success
+		$job = Start-Job -ScriptBlock {
+			param ($sname, $affgroup, $slabel)
+			New-AzureStorageAccount -StorageAccountName $sname -AffinityGroup $affgroup -Label $slabel -ErrorAction Stop
+			} -ArgumentList $StorageName, $AffinityGroup, $StorageLabel
+		
+		Write-JobStatus -Job $job.Id
+		$job | Remove-Job
 
-		Write-Host "Creating new Azure Service"
-		New-AzureService -ServiceName $ServiceName -Location $Location -Label $ServiceLabel
-		Write-Success
+		# Create Azure service
+		Write-Host ([string]::Format("  {0,-35}", "Creating new Azure Service")) -NoNewline
+		$job = Start-Job -ScriptBlock {
+			param ($svcname, $loc, $svclabel)
+			New-AzureService -ServiceName $svcname -Location $loc -Label $svclabel
+			} -ArgumentList $ServiceName, $Location, $ServiceLabel
+		
+		Write-JobStatus -Job $job.Id
+		$job | Remove-Job
 
 		Write-Host -ForegroundColor Green "Prerequisite services created!"
 	} catch {
