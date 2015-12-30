@@ -1,6 +1,5 @@
 ﻿#Requires -Modules Azure
 
-
 [CmdletBinding()]
 Param(
 	[Parameter(Mandatory=$True, ParameterSetName="Prereqs")]
@@ -24,19 +23,13 @@ Param(
 	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]	
 	[string]$ServiceName,
 
-	[Parameter(Mandatory=$false, ParameterSetName="NoPrereqs")]
-	[string]$ServiceLabel,
-
 	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
 	[Parameter(Mandatory=$True, ParameterSetName="Prereqs")]
 	[ValidateScript({ $loc = $_; Get-AzureLocation | ? {$_.Name -match $loc}})]
 	[string]$Location,
 
 	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
-	[string]$StorageName,
-
-	[Parameter(Mandatory=$False, ParameterSetName="NoPrereqs")]
-	[string]$StorageLabel
+	[string]$StorageName
 
 
 )
@@ -141,9 +134,9 @@ if ($PSCmdlet.ParameterSetName.Equals(("NoPrereqs"))) {
 		try {
 			Write-Host ([string]::Format("  {0,-35}", "Creating new Storage Account")) -NoNewline
 			$job = Start-Job -ScriptBlock {
-				param ($sname, $loc, $slabel)
-				New-AzureStorageAccount -StorageAccountName $sname -Location $loc -Label $slabel -ErrorAction Stop | Out-Null
-				} -ArgumentList $StorageName, $Location, $StorageLabel
+				param ($sname, $loc)
+				New-AzureStorageAccount -StorageAccountName $sname -Location $loc -ErrorAction Stop | Out-Null
+				} -ArgumentList $StorageName, $Location
 		
 			Write-JobStatus -Job $job.Id
 			$job | Remove-Job
@@ -163,9 +156,9 @@ if ($PSCmdlet.ParameterSetName.Equals(("NoPrereqs"))) {
 			# Create Azure service
 			Write-Host ([string]::Format("  {0,-35}", "Creating new Azure Service")) -NoNewline
 			$job = Start-Job -ScriptBlock {
-				param ($svcname, $loc, $svclabel)
-				New-AzureService -ServiceName $svcname -Location $loc -Label $svclabel | Out-Null
-				} -ArgumentList $ServiceName, $Location, $ServiceLabel
+				param ($svcname, $loc)
+				New-AzureService -ServiceName $svcname -Location $loc | Out-Null
+				} -ArgumentList $ServiceName, $Location
 		
 			Write-JobStatus -Job $job.Id
 			$job | Remove-Job

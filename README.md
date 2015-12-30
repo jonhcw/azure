@@ -10,12 +10,12 @@ The script also requires you to login to Azure first. For example:
 
 ## Syntax
 ### Simple parameter set
-	CreateAzureVM.ps1 -VMName <string> -VMSize <string> -Password <string> -AdminUsername <string> -ServiceName <string>
+	CreateAzureVM.ps1 -VMName <string> -VMSize <string> -Password <string> -AdminUsername <string> -ServiceName <string> -Location <string> [<CommonParameters>]
 
 #### Example
 
 ### More detailed parameter set for checking / creating Storage Account and ServiceGroup
-	CreateAzureVM.ps1 -VMName <string> -VMSize <string> -Password <string> -AdminUsername <string> -ServiceName <string> -Location <string> -StorageName <string> [-ServiceLabel <string>] [-StorageLabel <string>]
+	CreateAzureVM.ps1 -VMName <string> -VMSize <string> -Password <string> -AdminUsername <string> -ServiceName <string> -Location <string> -StorageName <string> [<CommonParameters>]
 	
 #### Example
 	CreateAzureVM.ps1 -VMName "NameOfYourVm" -VMSize Small -AdminUsername "NameOfAdminAccount" -Password "YourAdminPassword" -ServiceName "NameOfService" -Location "Central US" -StorageName "nameofyourstoragegroup"
