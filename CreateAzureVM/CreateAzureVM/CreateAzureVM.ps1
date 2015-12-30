@@ -24,7 +24,7 @@ Param(
 	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]	
 	[string]$ServiceName,
 
-	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
+	[Parameter(Mandatory=$false, ParameterSetName="NoPrereqs")]
 	[string]$ServiceLabel,
 
 	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
@@ -34,7 +34,7 @@ Param(
 	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
 	[string]$StorageName,
 
-	[Parameter(Mandatory=$True, ParameterSetName="NoPrereqs")]
+	[Parameter(Mandatory=$False, ParameterSetName="NoPrereqs")]
 	[string]$StorageLabel
 
 
@@ -52,8 +52,9 @@ function Write-Failure {
 	Write-Host "]"
 }
 
+# Working i a blinking message that is to be used when status can be updated somewhat regularly, for example with Jobs and other pollable items
 function Write-Working  {
-	param ([string]$Message, [int]$CursorHorizontalPosition, [int]$Number, [switch]$NumberIsSeconds)
+	param ([string]$Message, [int]$CursorHorizontalPosition, [int]$Number, [datetime]$StartTime)
 	$startp = $CursorHorizontalPosition
 	[Console]::Write("[")
 
@@ -66,8 +67,8 @@ function Write-Working  {
 	[Console]::ForegroundColor = $color
 	[Console]::Write(" WORKING ")
 	[Console]::ForegroundColor = $startc
-	if ($NumberIsSeconds) {
-	[Console]::Write("] $($Number)s ")
+	if ($StartTime) {
+	[Console]::Write("] $([int]((get-date) - $StartTime).TotalSeconds)s ")
 	} else {
 		[Console]::Write("]")
 	}
@@ -76,13 +77,22 @@ function Write-Working  {
 	[Console]::CursorLeft = $startp
 }
 
+# Waiting is a static message that is to be used when status can't be updated or it is not reasonable, for example when running commands with brief duration such as get-azurevm you don't want to write a job around.
+function Write-Waiting {
+	Write-Host "[" -NoNewline
+	Write-Host -ForegroundColor Cyan " WAITING " -NoNewline
+	Write-Host "]" -NoNewline
+	[Console]::CursorLeft = ([Console]::CursorLeft) - 11
+}
 
+# Write-JobStatus is used with Jobs
 function Write-JobStatus {
 	param ([int]$JobId)
-
+	$StartTime = get-date
+	
 	$n = 0
 	while (!(get-job -Id $JobId).State.Equals("Completed")) {
-		Write-Working -CursorHorizontalPosition ([Console]::CursorLeft) -Number $n -NumberIsSeconds
+		Write-Working -CursorHorizontalPosition ([Console]::CursorLeft) -Number $n -StartTime $StartTime
 		$n++
 		Start-Sleep -Seconds 1
 	}
@@ -97,6 +107,7 @@ function Write-JobStatus {
 	Write-Success
 }
 
+Write-Host "`nCreating Virtual Machine $($VMName)`n"
 
 # If user also needs to create Storage Account / Service
 if ($PSCmdlet.ParameterSetName.Equals(("NoPrereqs"))) {
@@ -110,11 +121,14 @@ if ($PSCmdlet.ParameterSetName.Equals(("NoPrereqs"))) {
 	}
 
 	# Check StorageAccount
+	Write-Host ([string]::Format("  {0,-35}", "StorageAccount Status")) -NoNewline
+	Write-Waiting
 	if ((Get-AzureStorageAccount -WarningAction silentlycontinue | ? {$_.StorageAccountName.Equals($StorageName)}) -ne $null) {
-		Write-Host ([string]::Format("  {0,-35}", "StorageAccount Status")) -NoNewline
 		Write-Success
 	} else {
-			# Create StorageAccount
+		Write-Failure
+		
+		# Create StorageAccount
 		try {
 			Write-Host ([string]::Format("  {0,-35}", "Creating new Storage Account")) -NoNewline
 			$job = Start-Job -ScriptBlock {
@@ -130,10 +144,12 @@ if ($PSCmdlet.ParameterSetName.Equals(("NoPrereqs"))) {
 	}
 
 	# Check service
+	Write-Host ([string]::Format("  {0,-35}", "AzureService Status")) -NoNewline
+	Write-Waiting
 	if ((Get-AzureService -WarningAction silentlycontinue | ? {$_.ServiceName.Equals($ServiceName)}) -ne $null) {
-		Write-Host ([string]::Format("  {0,-35}", "AzureService Status")) -NoNewline
 		Write-Success
 	} else {
+		Write-Failure
 		try {
 			# Create Azure service
 			Write-Host ([string]::Format("  {0,-35}", "Creating new Azure Service")) -NoNewline
@@ -154,16 +170,16 @@ if ($PSCmdlet.ParameterSetName.Equals(("NoPrereqs"))) {
 # Run commands to actually create the VM. Run as a Job so we can print status information
 $job = Start-Job -ScriptBlock {
 	param ($vname, $vsize, $pw, $user, $svc)
-	$ImageName = (get-azurevmimage | ? {$_.imagename -like "*2012*datacenter*"} |  Sort-Object -Descending publisheddate)[0].imagename
-	$VMConfig = New-AzureVMConfig -Name $vname -InstanceSize $vsize -ImageName $ImageName | Out-Null
-	$ProvisioningConfig = $VMConfig | Add-AzureProvisioningConfig -Windows -Password $pw -AdminUsername $user | Out-Null
-	$ProvisioningConfig | New-AzureVM -ServiceName $svc | Out-Null
+	$ImageName = (get-azurevmimage -ErrorAction Stop| ? {$_.imagename -like "*2012*datacenter*"} |  Sort-Object -Descending publisheddate)[0].imagename
+	$VMConfig = New-AzureVMConfig -Name $vname -InstanceSize $vsize -ImageName $ImageName -ErrorAction Stop 
+	$ProvisioningConfig = $VMConfig | Add-AzureProvisioningConfig -Windows -Password $pw -AdminUsername $user -ErrorAction Stop 
+	$ProvisioningConfig | New-AzureVM -ServiceName $svc -ErrorAction Stop -WarningAction SilentlyContinue | Out-Null
 	} -ArgumentList $VMName, $VMSize, $Password, $AdminUsername, $ServiceName
 
 
 Write-Host ([string]::Format("  {0,-35}", "Running New-AzureVM")) -NoNewline
 Write-JobStatus -Job $job.Id
-$job | Remove-Job
+#$job | Remove-Job
 
 # Wait for the VM status to become "ReadyRole". If there are any error codes, break and report.
 Write-Host ([string]::Format("  {0,-35}", "Waiting for 'ReadyRole' status")) -NoNewline
@@ -172,7 +188,6 @@ $VM = Get-AzureVM -ServiceName $ServiceName -Name $VMName
 $n = 0
 while (!$VM.Status.Equals("ReadyRole")) {
 	if ($VM.InstanceErrorCode -ne $null) {
-		
 		break
 	}
 
