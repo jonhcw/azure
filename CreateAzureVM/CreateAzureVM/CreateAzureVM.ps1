@@ -47,6 +47,26 @@ Param(
 
 )
 
+function Write-Working  {
+	param ([int]$CursorHorizontalPosition, [int]$Number)
+	$startp = $CursorHorizontalPosition
+	[Console]::Write("[")
+
+
+	$startt = [Console]::CursorTop
+	$startc = [Console]::ForegroundColor
+	$color = "";
+
+	if ($i % 2 -eq 0) { $color = [Console]::BackgroundCOlor } else { $color = [System.ConsoleColor]::Yellow }
+	[Console]::CursorTop = $startt
+	[Console]::ForegroundColor = $color
+	[Console]::Write(" WORKING ")
+	[Console]::ForegroundColor = $startc
+	[Console]::Write("] $($i)s")
+	[Console]::CursorLeft = $startp
+
+}
+
 function Write-Success {
 	Write-Host "[" -NoNewline
 	Write-Host -ForegroundColor Green " SUCCESS " -NoNewline
@@ -57,6 +77,28 @@ function Write-Failure {
 	Write-Host "[" -NoNewline
 	Write-Host -ForegroundColor Red " FAILURE " -NoNewline
 	Write-Host "]"
+}
+
+function Write-Working  {
+	param ([int]$CursorHorizontalPosition, [int]$cursorVerticalPosition)
+	[Console]::Write("[")
+	$startp = $CursorHorizontalPosition + 1
+	$startt = [Console]::CursorTop
+	$startc = [Console]::ForegroundColor
+	for ($i = 0; $i -lt 10; $i++) {
+		$color = "";
+		if ($i % 2 -eq 0) { $color = [Console]::BackgroundCOlor } else { $color = [System.ConsoleColor]::Yellow }
+		[Console]::CursorLeft = $startp
+		[Console]::CursorTop = $startt
+		[Console]::ForegroundColor = $color
+		[Console]::Write(" Working ")
+		[Console]::ForegroundColor = $startc
+		[Console]::Write("] $($i)s")
+		start-sleep -seconds 1
+	}
+	[Console]::ForegroundColor = $startc
+	write-host
+
 }
 
 # Check whether the Affinity Group exists and create it if it doesn't. Also craete StorageAccount and AzureService
@@ -93,9 +135,7 @@ if ((Get-AzureAffinityGroup | ? {$_.Name -match $AffinityGroup}) -eq $null) {
 		Write-Host -ForegroundColor Green "Prerequisite services created!"
 	} catch {
 			Write-Failure
-			Write-Warning "Error creating Affinity group or relevant services!"
 			throw $_.Exception.Message
-			exit
 	} 
 }
 
