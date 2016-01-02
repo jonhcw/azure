@@ -99,7 +99,7 @@ function Write-JobStatus {
 			$n++
 			Start-Sleep -Seconds 1
 		}
-		$job | Receive-Job 
+		Receive-Job -Id $JobId -ErrorAction Stop
 	} 
 	catch { 
 		Write-Failure 

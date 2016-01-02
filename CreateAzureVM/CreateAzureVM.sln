@@ -7,6 +7,8 @@ Project("{F5034706-568F-408A-B7B3-4D38C6DB8A32}") = "CreateAzureVM", "CreateAzur
 EndProject
 Project("{F5034706-568F-408A-B7B3-4D38C6DB8A32}") = "Deploy7Zip", "Deploy7Zip\Deploy7Zip.pssproj", "{8F90CA07-D261-4FE5-A66C-4FFF5A56368B}"
 EndProject
+Project("{F5034706-568F-408A-B7B3-4D38C6DB8A32}") = "StatusMessages", "StatusMessages\StatusMessages.pssproj", "{121BCAB0-1F51-4048-8E1E-67286B0B5B72}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{8F90CA07-D261-4FE5-A66C-4FFF5A56368B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8F90CA07-D261-4FE5-A66C-4FFF5A56368B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8F90CA07-D261-4FE5-A66C-4FFF5A56368B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{121BCAB0-1F51-4048-8E1E-67286B0B5B72}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{121BCAB0-1F51-4048-8E1E-67286B0B5B72}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{121BCAB0-1F51-4048-8E1E-67286B0B5B72}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{121BCAB0-1F51-4048-8E1E-67286B0B5B72}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
