@@ -71,5 +71,6 @@ function Write-JobStatus {
 		throw $_.Exception		
 	}
 
+	Remove-Job -Id $JobId
 	Write-Success
 }
