@@ -45,3 +45,23 @@ The script handles exceptions. ErrorAction Stop is used frequently so Exceptions
 ### Warnings
 Currently the script does not print out any warnings raised by the cmdlets
 
+
+
+# Deploy7Zip.p1
+
+## Requirements
+1. You must have Azure Powershell module installed.
+2. You must be logged into the Azure powershell
+3. You must obtain a certificate from the server. These instructions get the default self signed certificate.
+ 1. Open Powershell on the server and run command. This assumes that you haven't installed addition certificates
+            (Get-ChildItem Cert:\LocalMachine\My)[0] | Export-Certificate -FilePath c:\cert.cer
+ 2. Copy the certificate to the machine you want to run the deployment script from
+ 3. Open certificate manager on the same machine and add manager for local machine instance (run -> mmc -> file -> add/remove snap-in -> certificates)
+ 4. Navigate to "Trusted Root Certification Authorities" and right click "Certificates". Choose "All Tasks" -> "Import"
+ 5. Browse to the cert.cer files and finish the dialog 
+ 
+## Syntax
+    Deploy7Zip.ps1 [-VMName] <string> [-ServiceName] <string> [-Username] <string> [-Password] <string> [<CommonParameters>] 
+
+## Notes
+This is a test script so it does not use a proper certificate. The script also skips CA check when connecting PS remote session
