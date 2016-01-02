@@ -42,7 +42,7 @@ $Session = New-PSSession -ComputerName $HostDNSName -Port $EndpointPS.Port  -Cre
 Write-Host " done"
 
 
-Write-Host " Running remote deployment commands.. " -NoNewline
+Write-Host " Running remote deployment commands.. "
 Invoke-Command -Session $Session -ScriptBlock {
 	# URL to installer executable
 	$MediaUrl = "http://www.7-zip.org/a/7z1514-x64.exe"
@@ -61,11 +61,11 @@ Invoke-Command -Session $Session -ScriptBlock {
 		# Download Media
 		Write-Host "  Downloading media.. " -NoNewline
 		Invoke-WebRequest $MediaUrl -OutFile $DownloadFullpath
-		Write-Host " File downloaded"
+		Write-Host " done"
 
 		Write-Host "  Running installer.. " -NoNewline
 		Invoke-Expression $InstallCommand
-		Write-Host "  7-Zip installed"
+		Write-Host " done"
 	
 	} catch {
 		Write-Warning " 7-Zip deployment failed!"
